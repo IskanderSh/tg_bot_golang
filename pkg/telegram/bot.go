@@ -1,16 +1,21 @@
 package telegram
 
 import (
+	pocket "github.com/IskanderSh/go-pocket-sdk"
+	"github.com/IskanderSh/th_bot_golang/pkg/repository"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"log"
 )
 
 type Bot struct {
-	bot *tgbotapi.BotAPI
+	bot             *tgbotapi.BotAPI
+	pocketClient    *pocket.Client
+	tokenRepository repository.TokenRepository
+	redirectURL     string
 }
 
-func NewBot(bot *tgbotapi.BotAPI) *Bot {
-	return &Bot{bot: bot}
+func NewBot(bot *tgbotapi.BotAPI, pocketClient *pocket.Client, tr repository.TokenRepository, redirectURL string) *Bot {
+	return &Bot{bot: bot, pocketClient: pocketClient, tokenRepository: tr, redirectURL: redirectURL}
 }
 
 func (b *Bot) Start() error {
@@ -29,25 +34,18 @@ func (b *Bot) Start() error {
 func (b *Bot) initUpdatesChannel() (tgbotapi.UpdatesChannel, error) {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-
 	return b.bot.GetUpdatesChan(u)
 }
 
 func (b *Bot) handleUpdates(updates tgbotapi.UpdatesChannel) {
 	for update := range updates {
-		if update.Message != nil {
-			b.handleMessage(update.Message)
+		if update.Message == nil {
+			continue
 		}
-	}
-}
-
-func (b *Bot) handleMessage(message *tgbotapi.Message) {
-	if message != nil { // If we got a message
-		log.Printf("[%s] %s", message.From.UserName, message.Text)
-
-		msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
-		msg.ReplyToMessageID = message.MessageID
-
-		b.bot.Send(msg)
+		if update.Message.IsCommand() {
+			b.handleCommand(update.Message)
+			continue
+		}
+		b.handleMessage(update.Message)
 	}
 }
