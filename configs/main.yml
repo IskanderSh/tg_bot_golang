@@ -1,0 +1,16 @@
+db_file: "bot.db"
+
+bot_url: "https://t.me/jsdkfndfbot"
+
+messages:
+  responses:
+    start:  "Hello! If you want save links in your Pocket account, you should give me access. To do this, follow the link\n%s"
+    already_authorized: "You already registered, send me your link and I will save it"
+    saved_successfully: "Link successfully saved"
+    unknown_command: "I dont know this command :("
+  errors:
+    default: "Upsss, error, that I couldn't solve. Please write to https://t.me/iskansosik"
+    invalid_url: "Link isn't valid"
+    unauthorized: "You are not authorized! Use /start command"
+    unable_to_save: "Sorry, failed to save link. Try to do it one more time"
+    

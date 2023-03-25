@@ -1,14 +1,14 @@
 package telegram
 
 import (
-	"fmt"
+	"context"
+	pocket "github.com/IskanderSh/go-pocket-sdk"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"net/url"
 )
 
 const (
-	commandStart       = "start"
-	replyStartTemplate = "Hello! If you want save links in your Pocket account, you should give me access." +
-		"To do this, follow the link\n%s"
+	commandStart = "start"
 )
 
 func (b *Bot) handleCommand(message *tgbotapi.Message) error {
@@ -20,32 +20,38 @@ func (b *Bot) handleCommand(message *tgbotapi.Message) error {
 	}
 }
 
-func (b *Bot) handleMessage(message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, message.Text)
-	msg.ReplyToMessageID = message.MessageID
-
-	b.bot.Send(msg)
+func (b *Bot) handleMessage(message *tgbotapi.Message) error {
+	_, err := url.ParseQuery(message.Text)
+	if err != nil {
+		return errInvalidURL
+	}
+	accessToken, err := b.getAccessToken(message.Chat.ID)
+	if err != nil {
+		return errUnauthorized
+	}
+	if err = b.pocketClient.Add(context.Background(), pocket.AddInput{
+		AccessToken: accessToken,
+		URL:         message.Text,
+	}); err != nil {
+		return errUnableToSave
+	}
+	msg := tgbotapi.NewMessage(message.Chat.ID, b.messages.SavedSuccessfully)
+	_, err = b.bot.Send(msg)
+	return err
 }
 
 func (b *Bot) handleStartCommand(message *tgbotapi.Message) error {
-	authLink, err := b.generateAuthorizationLink(message.Chat.ID)
+	_, err := b.getAccessToken(message.Chat.ID)
 	if err != nil {
-		fmt.Println("WARNING: Couldn't get authorization link")
-		return err
+		return b.initAuthorizationProcess(message)
 	}
-
-	msg := tgbotapi.NewMessage(message.Chat.ID,
-		fmt.Sprintf(replyStartTemplate, authLink))
+	msg := tgbotapi.NewMessage(message.Chat.ID, b.messages.AlreadyAuthorized)
 	_, err = b.bot.Send(msg)
-	if err != nil {
-		fmt.Println("WARNING: Couldn't send message")
-		return err
-	}
-	return nil
+	return err
 }
 
 func (b *Bot) handleUnknownCommand(message *tgbotapi.Message) error {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "I dont know this command :(")
+	msg := tgbotapi.NewMessage(message.Chat.ID, b.messages.UnknownCommand)
 	_, err := b.bot.Send(msg)
 	if err != nil {
 		return err
